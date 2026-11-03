@@ -1,18 +1,28 @@
 {
   "project_info": {
-    "project_number": "000000000000",
-    "project_id": "demo-field-reports",
-    "storage_bucket": "demo-field-reports.appspot.com"
+    "project_number": "524909620017",
+    "project_id": "rnassignment-94abb",
+    "storage_bucket": "rnassignment-94abb.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
-        "android_client_info": { "package_name": "com.ikrama.assignment" }
+        "mobilesdk_app_id": "1:524909620017:android:70fa029da3c009b9cfde10",
+        "android_client_info": {
+          "package_name": "com.ikrama.assignment"
+        }
       },
       "oauth_client": [],
-      "api_key": [{ "current_key": "demo-api-key" }],
-      "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+      "api_key": [
+        {
+          "current_key": "AIzaSyBG7CABnhL2tHwlbKkpJgIqyN6t2eofODY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"
