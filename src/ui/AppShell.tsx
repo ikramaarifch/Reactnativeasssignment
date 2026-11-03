@@ -32,6 +32,8 @@ const DEV_TAP_WINDOW_MS = 2_000;
 export function AppShell({ services }: { services: Services }) {
   const [tab, setTab] = useState<Tab>('compose');
   const [devOpen, setDevOpen] = useState(false);
+  // Bumped after a reset: remounts the compose form so it drops photos whose temp files were deleted.
+  const [composeKey, setComposeKey] = useState(0);
   const taps = useRef<number[]>([]);
   const { reports } = useEngineState(services.engine);
   const isOnline = useOnline(services.connectivity);
@@ -63,6 +65,7 @@ export function AppShell({ services }: { services: Services }) {
         {devOpen ? <DevSettingsScreen engine={services.engine} faults={services.faults} /> : null}
         <View style={[styles.body, tab !== 'compose' || devOpen ? styles.hidden : null]}>
           <ComposeScreen
+            key={composeKey}
             save={services.save}
             newReportId={services.newReportId}
             onViewReports={() => setTab('reports')}
@@ -73,6 +76,10 @@ export function AppShell({ services }: { services: Services }) {
             engine={services.engine}
             isOnline={isOnline}
             onCreate={() => setTab('compose')}
+            onReset={async () => {
+              await services.reset();
+              setComposeKey(k => k + 1);
+            }}
           />
         </View>
         <View style={[styles.body, tab !== 'review' || devOpen ? styles.hidden : null]}>

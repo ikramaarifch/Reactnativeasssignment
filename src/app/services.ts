@@ -3,7 +3,7 @@ import { Report } from '../core/types';
 import { UploadEngine } from '../core/UploadEngine';
 import { uuidV4 } from '../core/uuid';
 import { getFirestoreInstance, getStorageInstance } from '../config/firebase';
-import { createImagePipeline } from '../images/createImagePipeline';
+import { createImagePipeline, PREPARED_DIR } from '../images/createImagePipeline';
 import { rnFileSystem } from '../images/RnFileSystem';
 import { ConnectivityMonitor } from '../network/ConnectivityMonitor';
 import { createConnectivityMonitor } from '../network/rnNetInfo';
@@ -14,6 +14,7 @@ import { openQueueDatabase } from '../storage/openQueueDatabase';
 import { SqliteQueueStore } from '../storage/SqliteQueueStore';
 import { FaultController, FaultyTransport } from '../transport/FaultyTransport';
 import { FirebaseTransport } from '../transport/FirebaseTransport';
+import { resetAll, ResetError } from './reset';
 import { saveReport, SaveReportInput } from './saveReport';
 
 export interface Services {
@@ -25,6 +26,8 @@ export interface Services {
   /** A fresh report id for a new draft (UUID v4, generated on the phone). */
   newReportId: () => string;
   save: (input: SaveReportInput) => Promise<Report>;
+  /** "Start over": wipes everything local. Never touches the server. */
+  reset: () => Promise<void>;
 }
 
 let services: Services | null = null;
@@ -40,8 +43,9 @@ export function getServices(): Services {
       new FirebaseTransport(getStorageInstance(), getFirestoreInstance()),
       faults,
     );
+    const store = new SqliteQueueStore(openQueueDatabase());
     const engine = new UploadEngine({
-      store: new SqliteQueueStore(openQueueDatabase()),
+      store,
       transport,
       preparer: createImagePipeline(),
     });
@@ -60,6 +64,23 @@ export function getServices(): Services {
           return bytes;
         }),
       save: input => saveReport({ fs: rnFileSystem, engine, imagesDir, now: Date.now }, input),
+      reset: async () => {
+        try {
+          await resetAll({
+            engine,
+            store,
+            fs: rnFileSystem,
+            imagesDir,
+            preparedDir: PREPARED_DIR,
+            cacheDir: ReactNativeBlobUtil.fs.dirs.CacheDir,
+          });
+        } catch (e) {
+          if (e instanceof ResetError) {
+            throw new Error(`Some data could not be deleted (${e.leftovers.join(', ')}). Try again.`);
+          }
+          throw e;
+        }
+      },
     };
   }
   return services;

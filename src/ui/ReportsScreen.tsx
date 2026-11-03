@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { describeReport } from '../core/statusView';
 import { Report } from '../core/types';
 import { UploadEngine } from '../core/UploadEngine';
 import { useNow } from './hooks';
+import { ResetControl } from './ResetControl';
 import { useEngineState } from './useExternalStore';
 import { colors, HIT, toneColors } from './theme';
 
@@ -12,13 +13,15 @@ interface Props {
   engine: UploadEngine;
   isOnline: boolean | undefined;
   onCreate: () => void;
+  onReset: () => Promise<void>;
 }
 
 /** Local queue: every report with exactly one clear status. Observes the engine only. */
-export function ReportsScreen({ engine, isOnline, onCreate }: Props) {
+export function ReportsScreen({ engine, isOnline, onCreate, onReset }: Props) {
   const { reports, progress } = useEngineState(engine);
   const now = useNow(reports.some(r => r.status === 'failed_retrying'));
   const newestFirst = [...reports].reverse();
+  const [note, setNote] = useState<string | null>(null);
 
   return (
     <SafeAreaView style={styles.root} edges={[]}>
@@ -26,7 +29,12 @@ export function ReportsScreen({ engine, isOnline, onCreate }: Props) {
         data={newestFirst}
         keyExtractor={r => r.id}
         contentContainerStyle={newestFirst.length === 0 ? styles.emptyWrap : styles.list}
-        ListEmptyComponent={<EmptyState onCreate={onCreate} />}
+        ListEmptyComponent={<EmptyState onCreate={onCreate} note={note} />}
+        ListFooterComponent={
+          newestFirst.length > 0 ? (
+            <ResetControl reports={reports} onReset={onReset} onDone={setNote} />
+          ) : undefined
+        }
         renderItem={({ item }) => (
           <ReportCard
             report={item}
@@ -41,9 +49,10 @@ export function ReportsScreen({ engine, isOnline, onCreate }: Props) {
   );
 }
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+function EmptyState({ onCreate, note }: { onCreate: () => void; note: string | null }) {
   return (
     <View style={styles.empty}>
+      {note ? <Text style={styles.note}>{note}</Text> : null}
       <Text style={styles.emptyTitle}>No reports yet</Text>
       <Text style={styles.emptyBody}>
         Reports you save appear here, each with its status, until they are on the server.
@@ -112,6 +121,14 @@ const styles = StyleSheet.create({
   list: { padding: 16, gap: 12 },
   emptyWrap: { flexGrow: 1, justifyContent: 'center' },
   empty: { padding: 32, alignItems: 'center', gap: 12 },
+  note: {
+    fontSize: 14,
+    color: colors.successText,
+    backgroundColor: colors.successBg,
+    borderRadius: 10,
+    padding: 12,
+    textAlign: 'center',
+  },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: colors.text },
   emptyBody: { fontSize: 15, color: colors.muted, textAlign: 'center', lineHeight: 21 },
   cta: {
