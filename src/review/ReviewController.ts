@@ -29,7 +29,7 @@ export function toReviewError(error: unknown): ReviewError {
     case 'unavailable':
     case 'timeout':
     case 'deadline-exceeded':
-      return { kind: 'offline', message: 'Can not reach the server. Check your connection.' };
+      return { kind: 'offline', message: 'Cannot reach the server. Check your connection.' };
     case 'permission-denied':
     case 'unauthenticated':
       return { kind: 'refused', message: 'The server did not allow viewing reports.' };
