@@ -5,6 +5,8 @@ import { uuidV4 } from '../core/uuid';
 import { getFirestoreInstance, getStorageInstance } from '../config/firebase';
 import { createImagePipeline } from '../images/createImagePipeline';
 import { rnFileSystem } from '../images/RnFileSystem';
+import { ConnectivityMonitor } from '../network/ConnectivityMonitor';
+import { createConnectivityMonitor } from '../network/rnNetInfo';
 import { openQueueDatabase } from '../storage/openQueueDatabase';
 import { SqliteQueueStore } from '../storage/SqliteQueueStore';
 import { FaultController, FaultyTransport } from '../transport/FaultyTransport';
@@ -14,6 +16,7 @@ import { saveReport, SaveReportInput } from './saveReport';
 export interface Services {
   engine: UploadEngine;
   faults: FaultController;
+  connectivity: ConnectivityMonitor;
   /** A fresh report id for a new draft (UUID v4, generated on the phone). */
   newReportId: () => string;
   save: (input: SaveReportInput) => Promise<Report>;
@@ -41,6 +44,7 @@ export function getServices(): Services {
     services = {
       engine,
       faults,
+      connectivity: createConnectivityMonitor(),
       newReportId: () =>
         uuidV4(bytes => {
           // Polyfilled by react-native-get-random-values (see index.js).

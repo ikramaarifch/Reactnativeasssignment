@@ -2,20 +2,34 @@ import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Services } from '../app/services';
+import { pendingCount } from '../core/statusView';
 import { ComposeScreen } from './ComposeScreen';
 import { DevSettingsScreen } from './DevSettingsScreen';
+import { useOnline } from './hooks';
+import { NetworkBanner } from './NetworkBanner';
+import { ReportsScreen } from './ReportsScreen';
+import { TabBar } from './TabBar';
 import { colors, HIT } from './theme';
+import { useEngineState } from './useExternalStore';
 
+type Tab = 'compose' | 'reports';
+
+const TITLES: Record<Tab, string> = { compose: 'New report', reports: 'My reports' };
 const DEV_TAPS = 5;
 const DEV_TAP_WINDOW_MS = 2_000;
 
 /**
- * Top-level frame. The dev/test screen is hidden from normal users: tap the
- * title 5 times quickly to toggle it (testers are told in the README).
+ * Top-level frame: header, global network/queue banner, the active screen, and
+ * bottom tabs. Screens stay mounted when inactive so a half-written report
+ * survives a peek at the queue. The dev/test screen is hidden: tap the title
+ * 5 times quickly to toggle it.
  */
 export function AppShell({ services }: { services: Services }) {
+  const [tab, setTab] = useState<Tab>('compose');
   const [devOpen, setDevOpen] = useState(false);
   const taps = useRef<number[]>([]);
+  const { reports } = useEngineState(services.engine);
+  const isOnline = useOnline(services.connectivity);
 
   const onTitlePress = () => {
     const now = Date.now();
@@ -29,15 +43,39 @@ export function AppShell({ services }: { services: Services }) {
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <Pressable onPress={onTitlePress} accessibilityRole="header" style={styles.header}>
-        <Text style={styles.title}>{devOpen ? 'Dev settings' : 'New report'}</Text>
+        <Text style={styles.title}>{devOpen ? 'Dev settings' : TITLES[tab]}</Text>
       </Pressable>
+      <NetworkBanner reports={reports} isOnline={isOnline} />
+
       <View style={styles.body}>
-        {devOpen ? (
-          <DevSettingsScreen {...services} />
-        ) : (
-          <ComposeScreen save={services.save} newReportId={services.newReportId} />
-        )}
+        {devOpen ? <DevSettingsScreen engine={services.engine} faults={services.faults} /> : null}
+        <View style={[styles.body, tab !== 'compose' || devOpen ? styles.hidden : null]}>
+          <ComposeScreen
+            save={services.save}
+            newReportId={services.newReportId}
+            onViewReports={() => setTab('reports')}
+          />
+        </View>
+        <View style={[styles.body, tab !== 'reports' || devOpen ? styles.hidden : null]}>
+          <ReportsScreen
+            engine={services.engine}
+            isOnline={isOnline}
+            onCreate={() => setTab('compose')}
+          />
+        </View>
       </View>
+
+      <TabBar
+        active={tab}
+        onChange={key => {
+          setDevOpen(false);
+          setTab(key);
+        }}
+        tabs={[
+          { key: 'compose', label: 'New report' },
+          { key: 'reports', label: 'My reports', badge: pendingCount(reports) },
+        ]}
+      />
     </SafeAreaView>
   );
 }
@@ -53,4 +91,5 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 20, fontWeight: '700', color: colors.text },
   body: { flex: 1 },
+  hidden: { display: 'none' },
 });

@@ -21,14 +21,17 @@ import { pickFromGallery, takePhoto } from './photoPicker';
 import { colors, HIT } from './theme';
 import { usePermission } from './useCameraPermission';
 
-type Props = Pick<Services, 'save' | 'newReportId'>;
+type Props = Pick<Services, 'save' | 'newReportId'> & {
+  /** Jump to the queue so the user can watch the report's status. */
+  onViewReports: () => void;
+};
 
 /**
  * Compose + save. This screen holds only form state: validation rules live in
  * core, the save flow in app/saveReport, and the upload happens later in the
  * engine. "Saved" here always means "on this phone", never "uploaded".
  */
-export function ComposeScreen({ save, newReportId }: Props) {
+export function ComposeScreen({ save, newReportId, onViewReports }: Props) {
   // One id per draft: pressing Save twice is idempotent (same report, not two).
   const draftId = useRef(newReportId());
   const [description, setDescription] = useState('');
@@ -145,6 +148,7 @@ export function ComposeScreen({ save, newReportId }: Props) {
             Your report is stored safely. It will be sent to the server automatically once there is a connection.
           </Text>
           <PrimaryButton label="New report" onPress={reset} />
+          <SecondaryButton label="See status" onPress={onViewReports} />
         </View>
       </SafeAreaView>
     );

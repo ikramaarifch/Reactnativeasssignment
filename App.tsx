@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { StatusBar, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { rnAppState } from './src/app/rnAppState';
 import { getServices } from './src/app/services';
+import { startRetryTriggers } from './src/app/triggers';
 import { AppShell } from './src/ui/AppShell';
 
 function App() {
@@ -11,7 +13,10 @@ function App() {
   // Load the queue from disk and resume anything unfinished.
   useEffect(() => {
     services.engine.start();
+    // Retry immediately when the network returns or the app comes to the front.
+    const stopTriggers = startRetryTriggers(services.engine, services.connectivity, rnAppState);
     return () => {
+      stopTriggers();
       services.engine.stop();
     };
   }, [services]);
