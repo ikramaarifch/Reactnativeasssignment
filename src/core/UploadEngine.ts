@@ -13,6 +13,7 @@ import {
   ReportStatus,
 } from './types';
 import { ImagePrepareError } from '../images/ImagePreparer';
+import { Cancel, Scheduler, systemScheduler } from './scheduler';
 import { withWatchdog } from './watchdog';
 
 export interface ImageProgress {
@@ -39,6 +40,8 @@ export interface EngineOptions {
   uploadStallMs?: number;
   /** Abort small calls (metadata check, Firestore commit) after this long. */
   requestTimeoutMs?: number;
+  /** Timer source. Defaults to setTimeout; the app injects a native one that works in the background. */
+  scheduler?: Scheduler;
 }
 
 type Listener = () => void;
@@ -65,7 +68,8 @@ export class UploadEngine {
   private abort = new AbortController();
   private draining: Promise<void> | null = null;
   private rerun = false;
-  private wakeTimer: ReturnType<typeof setTimeout> | null = null;
+  private cancelWake: Cancel | null = null;
+  private readonly scheduler: Scheduler;
   private started = false;
   /** Bumped by stop()/reset(); lets stray async work notice it belongs to a dead run. */
   private epoch = 0;
@@ -79,6 +83,7 @@ export class UploadEngine {
     this.backoff = options.backoff ?? DEFAULT_BACKOFF;
     this.uploadStallMs = options.uploadStallMs ?? 30_000;
     this.requestTimeoutMs = options.requestTimeoutMs ?? 30_000;
+    this.scheduler = options.scheduler ?? systemScheduler;
   }
 
   // ---- observation (what the UI uses) ------------------------------------
@@ -100,6 +105,11 @@ export class UploadEngine {
    * is only true while a live process is doing it.
    */
   async start(): Promise<void> {
+    if (this.started) {
+      // Already running: a second start must not reset in-flight reports.
+      this.kick();
+      return;
+    }
     this.started = true;
     this.abort = new AbortController();
     for (const report of await this.store.list()) {
@@ -258,14 +268,12 @@ export class UploadEngine {
       return;
     }
     const delay = Math.max(0, Math.min(...waiting) - this.now());
-    this.wakeTimer = setTimeout(() => this.drain(), delay);
+    this.cancelWake = this.scheduler.after(delay, () => this.drain());
   }
 
   private clearWake(): void {
-    if (this.wakeTimer) {
-      clearTimeout(this.wakeTimer);
-      this.wakeTimer = null;
-    }
+    this.cancelWake?.();
+    this.cancelWake = null;
   }
 
   // ---- processing one report ----------------------------------------------
@@ -334,14 +342,21 @@ export class UploadEngine {
 
       // Lost-response / crash-after-upload guard: if the server already has
       // exactly these bytes, skip re-sending them (important on 2G).
-      const remote = await withWatchdog(this.requestTimeoutMs, this.abort.signal, signal =>
-        this.transport.getRemoteImage(path, signal),
+      const remote = await withWatchdog(
+        this.requestTimeoutMs,
+        this.abort.signal,
+        signal => this.transport.getRemoteImage(path, signal),
+        this.scheduler,
+        this.now,
       );
       const alreadyThere =
         remote !== null && remote.sizeBytes === sizeBytes && remote.md5Base64 === md5Base64;
 
       if (!alreadyThere) {
-        await withWatchdog(this.uploadStallMs, this.abort.signal, (signal, touch) =>
+        await withWatchdog(
+          this.uploadStallMs,
+          this.abort.signal,
+          (signal, touch) =>
           this.transport.uploadImage({
             path,
             localUri: preparedUri,
@@ -357,6 +372,8 @@ export class UploadEngine {
               });
             },
           }),
+          this.scheduler,
+          this.now,
         );
       }
       current = await this.updateImage(current, image.index, { status: 'uploaded' });
@@ -372,8 +389,12 @@ export class UploadEngine {
       createdAt: report.createdAt,
       status: 'complete',
     };
-    await withWatchdog(this.requestTimeoutMs, this.abort.signal, signal =>
-      this.transport.commitReport(doc, signal),
+    await withWatchdog(
+      this.requestTimeoutMs,
+      this.abort.signal,
+      signal => this.transport.commitReport(doc, signal),
+      this.scheduler,
+      this.now,
     );
   }
 

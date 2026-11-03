@@ -1,4 +1,5 @@
 import { NoProgressError } from './retryPolicy';
+import { Cancel, Scheduler, systemScheduler } from './scheduler';
 
 /**
  * No-progress watchdog. Aborts if `touch()` has not been called for `stallMs`.
@@ -14,11 +15,13 @@ export async function withWatchdog<T>(
   stallMs: number,
   parent: AbortSignal,
   run: (signal: AbortSignal, touch: () => void) => Promise<T>,
+  scheduler: Scheduler = systemScheduler,
+  now: () => number = Date.now,
 ): Promise<T> {
   const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancelTimer: Cancel | undefined;
+  let lastProgress = now();
   let stalled = false;
-
   const onParentAbort = () => controller.abort();
   if (parent.aborted) {
     controller.abort();
@@ -30,30 +33,34 @@ export async function withWatchdog<T>(
     rejectStall = reject;
   });
 
-  const arm = () => {
-    if (timer !== undefined) {
-      clearTimeout(timer);
-    }
-    timer = setTimeout(() => {
+  // touch() only records the time; ONE timer re-checks it. Progress events can
+  // arrive many times a second, and re-creating a timer for each would be wasteful
+  // (and, with a native timer, a bridge call each).
+  const touch = () => {
+    lastProgress = now();
+  };
+  const check = () => {
+    const quiet = now() - lastProgress;
+    if (quiet >= stallMs) {
       stalled = true;
       controller.abort();
       rejectStall(new NoProgressError(stallMs));
-    }, stallMs);
+    } else {
+      cancelTimer = scheduler.after(stallMs - quiet, check);
+    }
   };
 
-  arm();
+  cancelTimer = scheduler.after(stallMs, check);
   try {
     // Race so a transport that ignores the abort signal still can't hang us.
-    return await Promise.race([run(controller.signal, arm), stallPromise]);
+    return await Promise.race([run(controller.signal, touch), stallPromise]);
   } catch (e) {
     if (stalled) {
       throw new NoProgressError(stallMs);
     }
     throw e;
   } finally {
-    if (timer !== undefined) {
-      clearTimeout(timer);
-    }
+    cancelTimer?.();
     parent.removeEventListener('abort', onParentAbort);
   }
 }

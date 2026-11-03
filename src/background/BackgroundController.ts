@@ -1,4 +1,5 @@
 import { describeBackground, infoKey, ServiceInfo } from './describeBackground';
+import { Cancel, Scheduler, systemScheduler } from '../core/scheduler';
 import { Report } from '../core/types';
 import { ImageProgress } from '../core/UploadEngine';
 
@@ -36,7 +37,7 @@ export class BackgroundController {
   private running = false;
   private lastKey: string | null = null;
   private lastUpdateAt = 0;
-  private trailing: ReturnType<typeof setTimeout> | null = null;
+  private cancelTrailing: Cancel | null = null;
   private busy: Promise<void> = Promise.resolve();
   private prepared = false;
 
@@ -44,6 +45,7 @@ export class BackgroundController {
     private readonly port: ForegroundServicePort,
     private readonly source: BackgroundSource,
     private readonly now: () => number = Date.now,
+    private readonly scheduler: Scheduler = systemScheduler,
   ) {}
 
   /** Call on every engine / connectivity change. Safe to call very often. */
@@ -60,10 +62,8 @@ export class BackgroundController {
   }
 
   dispose(): void {
-    if (this.trailing) {
-      clearTimeout(this.trailing);
-      this.trailing = null;
-    }
+    this.cancelTrailing?.();
+    this.cancelTrailing = null;
   }
 
   /** Operations run one at a time so start/update/stop can never interleave. */
@@ -116,11 +116,11 @@ export class BackgroundController {
     const wait = this.lastUpdateAt + MIN_UPDATE_INTERVAL_MS - this.now();
     if (!force && wait > 0) {
       // Too soon: schedule one trailing update with the latest state.
-      if (!this.trailing) {
-        this.trailing = setTimeout(() => {
-          this.trailing = null;
+      if (!this.cancelTrailing) {
+        this.cancelTrailing = this.scheduler.after(wait, () => {
+          this.cancelTrailing = null;
           this.notify();
-        }, wait);
+        });
       }
       return;
     }

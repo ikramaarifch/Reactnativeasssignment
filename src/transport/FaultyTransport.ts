@@ -1,4 +1,5 @@
 import { ReportDocument } from '../core/types';
+import { Scheduler, systemScheduler } from '../core/scheduler';
 import { abortable } from './abortable';
 import {
   RemoteImageInfo,
@@ -58,13 +59,18 @@ export class FaultController {
 
 export type Sleep = (ms: number, signal: AbortSignal) => Promise<void>;
 
-const abortableSleep: Sleep = (ms, signal) =>
-  abortable(
-    signal,
-    new Promise<void>(resolve => {
-      setTimeout(resolve, ms);
-    }),
-  );
+/** A sleep driven by a Scheduler (so slow-mode simulation also runs in the background). */
+export const schedulerSleep =
+  (scheduler: Scheduler): Sleep =>
+  (ms, signal) =>
+    abortable(
+      signal,
+      new Promise<void>(resolve => {
+        scheduler.after(ms, resolve);
+      }),
+    );
+
+const abortableSleep = schedulerSleep(systemScheduler);
 
 const TICK_MS = 200;
 

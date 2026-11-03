@@ -190,6 +190,20 @@ describe('kill / restart at every state', () => {
     await h.stopAll();
   });
 
+  it('a second start() while running does not disturb an in-flight report', async () => {
+    const h = new Harness();
+    h.transport.beforeUpload = req => hangUntilAborted(req.signal);
+    const engine = h.engine();
+    await engine.start();
+    await engine.enqueue(newReport('r1', 1));
+    await until(engine, reportIs('r1', 'uploading'));
+
+    await engine.start(); // e.g. headless task + UI both start the engine
+    expect(statusOf(engine, 'r1')).toBe('uploading'); // not knocked back to saved_locally
+    expect((await h.store.get('r1'))?.status).toBe('uploading');
+    await h.stopAll();
+  });
+
   it('an uploaded report stays uploaded after restart and is not re-sent', async () => {
     const h = new Harness();
     const first = h.engine();
