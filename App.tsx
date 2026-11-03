@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { StatusBar, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getServices } from './src/app/services';
-import { DevSettingsScreen } from './src/ui/DevSettingsScreen';
+import { AppShell } from './src/ui/AppShell';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -19,7 +19,7 @@ function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <DevSettingsScreen {...services} />
+      <AppShell services={services} />
     </SafeAreaProvider>
   );
 }

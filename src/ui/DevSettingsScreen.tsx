@@ -19,7 +19,7 @@ const MODES: Array<{ mode: FaultMode; label: string }> = [
  * Developer/tester screen: inject network failures and drive the engine.
  * Plain on purpose — the polished status UI comes in a later step.
  */
-export function DevSettingsScreen({ engine, faults }: Services) {
+export function DevSettingsScreen({ engine, faults }: Pick<Services, 'engine' | 'faults'>) {
   const state = useEngineState(engine);
   const config = useFaultConfig(faults);
   const [message, setMessage] = useState<string | null>(null);
@@ -34,10 +34,8 @@ export function DevSettingsScreen({ engine, faults }: Services) {
   };
 
   return (
-    <SafeAreaView style={styles.root}>
+    <SafeAreaView style={styles.root} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Dev settings</Text>
-
         <Text style={styles.heading}>Failure injection</Text>
         {MODES.map(({ mode, label }) => (
           <Button
