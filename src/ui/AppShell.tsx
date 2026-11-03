@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Services } from '../app/services';
@@ -8,13 +8,18 @@ import { DevSettingsScreen } from './DevSettingsScreen';
 import { useOnline } from './hooks';
 import { NetworkBanner } from './NetworkBanner';
 import { ReportsScreen } from './ReportsScreen';
+import { ReviewScreen } from './ReviewScreen';
 import { TabBar } from './TabBar';
 import { colors, HIT } from './theme';
 import { useEngineState } from './useExternalStore';
 
-type Tab = 'compose' | 'reports';
+type Tab = 'compose' | 'reports' | 'review';
 
-const TITLES: Record<Tab, string> = { compose: 'New report', reports: 'My reports' };
+const TITLES: Record<Tab, string> = {
+  compose: 'New report',
+  reports: 'My reports',
+  review: 'Review',
+};
 const DEV_TAPS = 5;
 const DEV_TAP_WINDOW_MS = 2_000;
 
@@ -30,6 +35,13 @@ export function AppShell({ services }: { services: Services }) {
   const taps = useRef<number[]>([]);
   const { reports } = useEngineState(services.engine);
   const isOnline = useOnline(services.connectivity);
+
+  // Opening Review always revalidates against the server; old data stays visible meanwhile.
+  useEffect(() => {
+    if (tab === 'review') {
+      services.review.refresh();
+    }
+  }, [tab, services.review]);
 
   const onTitlePress = () => {
     const now = Date.now();
@@ -63,6 +75,13 @@ export function AppShell({ services }: { services: Services }) {
             onCreate={() => setTab('compose')}
           />
         </View>
+        <View style={[styles.body, tab !== 'review' || devOpen ? styles.hidden : null]}>
+          <ReviewScreen
+            controller={services.review}
+            repo={services.reviewRepo}
+            waitingLocally={pendingCount(reports)}
+          />
+        </View>
       </View>
 
       <TabBar
@@ -74,6 +93,7 @@ export function AppShell({ services }: { services: Services }) {
         tabs={[
           { key: 'compose', label: 'New report' },
           { key: 'reports', label: 'My reports', badge: pendingCount(reports) },
+          { key: 'review', label: 'Review' },
         ]}
       />
     </SafeAreaView>

@@ -7,6 +7,9 @@ import { createImagePipeline } from '../images/createImagePipeline';
 import { rnFileSystem } from '../images/RnFileSystem';
 import { ConnectivityMonitor } from '../network/ConnectivityMonitor';
 import { createConnectivityMonitor } from '../network/rnNetInfo';
+import { FirebaseReviewRepository } from '../review/FirebaseReviewRepository';
+import { ReviewController } from '../review/ReviewController';
+import { ReviewRepository } from '../review/types';
 import { openQueueDatabase } from '../storage/openQueueDatabase';
 import { SqliteQueueStore } from '../storage/SqliteQueueStore';
 import { FaultController, FaultyTransport } from '../transport/FaultyTransport';
@@ -17,6 +20,8 @@ export interface Services {
   engine: UploadEngine;
   faults: FaultController;
   connectivity: ConnectivityMonitor;
+  review: ReviewController;
+  reviewRepo: ReviewRepository;
   /** A fresh report id for a new draft (UUID v4, generated on the phone). */
   newReportId: () => string;
   save: (input: SaveReportInput) => Promise<Report>;
@@ -40,11 +45,14 @@ export function getServices(): Services {
       transport,
       preparer: createImagePipeline(),
     });
+    const reviewRepo = new FirebaseReviewRepository(getFirestoreInstance(), getStorageInstance());
     const imagesDir = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/images`;
     services = {
       engine,
       faults,
       connectivity: createConnectivityMonitor(),
+      review: new ReviewController(reviewRepo),
+      reviewRepo,
       newReportId: () =>
         uuidV4(bytes => {
           // Polyfilled by react-native-get-random-values (see index.js).
