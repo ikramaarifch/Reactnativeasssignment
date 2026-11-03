@@ -4,24 +4,17 @@ import {
   Firestore,
   initializeFirestore,
 } from '@react-native-firebase/firestore';
-import {
-  connectStorageEmulator,
-  FirebaseStorage,
-  getStorage,
-} from '@react-native-firebase/storage';
+import { USE_FIRESTORE_EMULATOR } from './target';
 
-// Debug builds talk to the Firebase Emulator Suite through `adb reverse`
-// (npm run adb:reverse), which forwards the phone's 127.0.0.1 ports to this PC.
-// It works the same for a USB phone and for an Android Studio emulator.
+// With the emulator, `adb reverse` (npm run adb:reverse) forwards the phone's
+// 127.0.0.1 to this PC; RNFB's own host remap is disabled in firebase.json.
 const EMULATOR_HOST = '127.0.0.1';
 const FIRESTORE_PORT = 8080;
-const STORAGE_PORT = 9199;
 
 let firestoreInstance: Firestore | null = null;
-let storageInstance: FirebaseStorage | null = null;
 
 /**
- * Must run once, before the first Firestore/Storage call.
+ * Must run once, before the first Firestore call.
  *
  * Firestore offline persistence is switched OFF on purpose: with it on, a
  * `setDoc` made offline is silently queued by the SDK and "succeeds" later,
@@ -33,10 +26,8 @@ export function configureFirebase(): void {
     return;
   }
   firestoreInstance = initializeFirestore(getApp(), { persistence: false });
-  storageInstance = getStorage();
-  if (__DEV__) {
+  if (__DEV__ && USE_FIRESTORE_EMULATOR) {
     connectFirestoreEmulator(firestoreInstance, EMULATOR_HOST, FIRESTORE_PORT);
-    connectStorageEmulator(storageInstance, EMULATOR_HOST, STORAGE_PORT);
   }
 }
 
@@ -45,11 +36,4 @@ export function getFirestoreInstance(): Firestore {
     configureFirebase();
   }
   return firestoreInstance as Firestore;
-}
-
-export function getStorageInstance(): FirebaseStorage {
-  if (!storageInstance) {
-    configureFirebase();
-  }
-  return storageInstance as FirebaseStorage;
 }

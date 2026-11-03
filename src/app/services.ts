@@ -2,7 +2,8 @@ import ReactNativeBlobUtil from 'react-native-blob-util';
 import { Report } from '../core/types';
 import { UploadEngine } from '../core/UploadEngine';
 import { uuidV4 } from '../core/uuid';
-import { getFirestoreInstance, getStorageInstance } from '../config/firebase';
+import { CLOUDINARY } from '../config/cloudinary';
+import { getFirestoreInstance } from '../config/firebase';
 import { createImagePipeline, PREPARED_DIR } from '../images/createImagePipeline';
 import { rnFileSystem } from '../images/RnFileSystem';
 import { BackgroundController } from '../background/BackgroundController';
@@ -10,13 +11,17 @@ import { rnForegroundService } from '../background/rnForegroundService';
 import { nativeScheduler } from '../background/rnScheduler';
 import { ConnectivityMonitor } from '../network/ConnectivityMonitor';
 import { createConnectivityMonitor } from '../network/rnNetInfo';
-import { FirebaseReviewRepository } from '../review/FirebaseReviewRepository';
+import { FirestoreReviewRepository } from '../review/FirestoreReviewRepository';
 import { ReviewController } from '../review/ReviewController';
 import { ReviewRepository } from '../review/types';
 import { openQueueDatabase } from '../storage/openQueueDatabase';
 import { SqliteQueueStore } from '../storage/SqliteQueueStore';
 import { FaultController, FaultyTransport, schedulerSleep } from '../transport/FaultyTransport';
-import { FirebaseTransport } from '../transport/FirebaseTransport';
+import { CloudinaryImageStore } from '../transport/cloudinary/CloudinaryImageStore';
+import { rnCloudinaryHttp } from '../transport/cloudinary/rnCloudinaryHttp';
+import { thumbnailUrl } from '../transport/cloudinary/urls';
+import { FirestoreCommitter } from '../transport/FirestoreCommitter';
+import { HybridTransport } from '../transport/HybridTransport';
 import { resetAll, ResetError } from './reset';
 import { saveReport, SaveReportInput } from './saveReport';
 
@@ -44,7 +49,11 @@ export function getServices(): Services {
   if (!services) {
     const faults = new FaultController();
     const transport = new FaultyTransport(
-      new FirebaseTransport(getStorageInstance(), getFirestoreInstance()),
+      // Photos -> Cloudinary; the commit marker -> Firestore.
+      new HybridTransport(
+        new CloudinaryImageStore(rnCloudinaryHttp),
+        new FirestoreCommitter(getFirestoreInstance()),
+      ),
       faults,
       schedulerSleep(nativeScheduler),
     );
@@ -55,7 +64,9 @@ export function getServices(): Services {
       preparer: createImagePipeline(),
       scheduler: nativeScheduler, // timers that keep firing while backgrounded
     });
-    const reviewRepo = new FirebaseReviewRepository(getFirestoreInstance(), getStorageInstance());
+    const reviewRepo = new FirestoreReviewRepository(getFirestoreInstance(), path =>
+      thumbnailUrl(CLOUDINARY.cloudName, path),
+    );
     const imagesDir = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/images`;
     const connectivity = createConnectivityMonitor();
     services = {

@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "emulators": "firebase emulators:start --project rnassignment-94abb",
     "test-images": "node scripts/test-images.js",
-    "adb:reverse": "adb reverse tcp:8080 tcp:8080 && adb reverse tcp:9199 tcp:9199 && adb reverse tcp:8081 tcp:8081"
+    "adb:reverse": "adb reverse tcp:8080 tcp:8080 && adb reverse tcp:8081 tcp:8081"
   },
   "dependencies": {
     "@bam.tech/react-native-image-resizer": "^3.0.11",
@@ -19,7 +19,6 @@
     "@react-native-community/netinfo": "^12.0.1",
     "@react-native-firebase/app": "^27.1.0",
     "@react-native-firebase/firestore": "^27.1.0",
-    "@react-native-firebase/storage": "^27.1.0",
     "@react-native/new-app-screen": "0.87.0",
     "react": "19.2.3",
     "react-native": "0.87.0",

@@ -103,7 +103,7 @@ function ReviewCard({ report, repo }: { report: ServerReport; repo: ReviewReposi
             repo={repo}
             path={path}
             position={i + 1}
-            auto={i === 0}
+            auto
             size={THUMB}
           />
         ))}
