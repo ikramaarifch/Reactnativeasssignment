@@ -5,6 +5,9 @@ import { uuidV4 } from '../core/uuid';
 import { getFirestoreInstance, getStorageInstance } from '../config/firebase';
 import { createImagePipeline, PREPARED_DIR } from '../images/createImagePipeline';
 import { rnFileSystem } from '../images/RnFileSystem';
+import { BackgroundController } from '../background/BackgroundController';
+import { rnForegroundService } from '../background/rnForegroundService';
+import { nativeScheduler } from '../background/rnScheduler';
 import { ConnectivityMonitor } from '../network/ConnectivityMonitor';
 import { createConnectivityMonitor } from '../network/rnNetInfo';
 import { FirebaseReviewRepository } from '../review/FirebaseReviewRepository';
@@ -12,7 +15,7 @@ import { ReviewController } from '../review/ReviewController';
 import { ReviewRepository } from '../review/types';
 import { openQueueDatabase } from '../storage/openQueueDatabase';
 import { SqliteQueueStore } from '../storage/SqliteQueueStore';
-import { FaultController, FaultyTransport } from '../transport/FaultyTransport';
+import { FaultController, FaultyTransport, schedulerSleep } from '../transport/FaultyTransport';
 import { FirebaseTransport } from '../transport/FirebaseTransport';
 import { resetAll, ResetError } from './reset';
 import { saveReport, SaveReportInput } from './saveReport';
@@ -21,6 +24,7 @@ export interface Services {
   engine: UploadEngine;
   faults: FaultController;
   connectivity: ConnectivityMonitor;
+  background: BackgroundController;
   review: ReviewController;
   reviewRepo: ReviewRepository;
   /** A fresh report id for a new draft (UUID v4, generated on the phone). */
@@ -42,19 +46,27 @@ export function getServices(): Services {
     const transport = new FaultyTransport(
       new FirebaseTransport(getStorageInstance(), getFirestoreInstance()),
       faults,
+      schedulerSleep(nativeScheduler),
     );
     const store = new SqliteQueueStore(openQueueDatabase());
     const engine = new UploadEngine({
       store,
       transport,
       preparer: createImagePipeline(),
+      scheduler: nativeScheduler, // timers that keep firing while backgrounded
     });
     const reviewRepo = new FirebaseReviewRepository(getFirestoreInstance(), getStorageInstance());
     const imagesDir = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/images`;
+    const connectivity = createConnectivityMonitor();
     services = {
       engine,
       faults,
-      connectivity: createConnectivityMonitor(),
+      connectivity,
+      background: new BackgroundController(rnForegroundService, {
+        getReports: () => engine.getState().reports,
+        getProgress: () => engine.getState().progress,
+        isOnline: () => connectivity.isOnline(),
+      }, Date.now, nativeScheduler),
       review: new ReviewController(reviewRepo),
       reviewRepo,
       newReportId: () =>
