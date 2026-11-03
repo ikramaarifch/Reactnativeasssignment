@@ -82,7 +82,9 @@ describe('FaultyTransport', () => {
       localUri: 'file:///x.jpg',
       sizeBytes: size,
       signal: new AbortController().signal,
-      onProgress: (b: number) => void progress.push(b),
+      onProgress: (b: number) => {
+        progress.push(b);
+      },
     });
     return { inner, faults, faulty, progress, request };
   }
@@ -196,7 +198,7 @@ describe('engine + FaultyTransport (the same path real failures take)', () => {
   });
 
   it('hang -> watchdog cuts it, then recovers once the hang clears', async () => {
-    const { h, faults, engine } = setup();
+    const { h, faults } = setup();
     faults.set({ mode: 'hang' });
     const e = h.engine({ transport: new FaultyTransport(h.transport, faults), uploadStallMs: 80, requestTimeoutMs: 80 });
     await e.start();
