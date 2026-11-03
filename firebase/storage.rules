@@ -4,12 +4,12 @@ rules_version = '2';
 // half of the "every image < 5 MB" guarantee: the client compresses, but we never
 // trust the client. There is no login in scope, so access is open; a real
 // deployment would add request.auth checks here.
-// TODO(step 4): also require image/jpeg once verified against real SDK uploads.
 service firebase.storage {
   match /b/{bucket}/o {
     match /reports/{reportId}/{fileName} {
       allow read: if true;
       allow write: if request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/jpeg')
                    && fileName.matches('[0-4][.]jpg');
     }
   }
