@@ -18,6 +18,12 @@ export const rnFileSystem: FileSystemPort = {
     }
     await fs.mv(from, to);
   },
+  copy: async (from, to) => {
+    if (await fs.exists(to)) {
+      await fs.unlink(to);
+    }
+    await fs.cp(from, to);
+  },
   remove: async path => {
     if (await fs.exists(path)) {
       await fs.unlink(path);

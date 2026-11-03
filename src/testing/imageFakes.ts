@@ -38,8 +38,27 @@ export class FakeFileSystem implements FileSystemPort {
     this.files.delete(from);
     this.files.set(to, f);
   }
+  /** Set to make the Nth copy (1-based) fail, to test cleanup. */
+  failCopyNumber?: number;
+  copies = 0;
+  async copy(from: string, to: string): Promise<void> {
+    this.copies++;
+    if (this.copies === this.failCopyNumber) {
+      throw new Error('ENOSPC: no space left on device');
+    }
+    const f = this.files.get(from);
+    if (!f) {
+      throw new Error(`ENOENT ${from}`);
+    }
+    this.files.set(to, { ...f });
+  }
   async remove(path: string): Promise<void> {
     this.files.delete(path);
+    for (const key of [...this.files.keys()]) {
+      if (key.startsWith(path + '/')) {
+        this.files.delete(key);
+      }
+    }
   }
 }
 

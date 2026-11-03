@@ -118,9 +118,15 @@ export class UploadEngine {
     this.setProgress(null);
   }
 
-  /** Saves a new report. Resolves once it is durable; upload happens afterwards. */
+  /**
+   * Saves a new report. Resolves once it is durable; upload happens afterwards.
+   * Idempotent on the report id: enqueueing an id that already exists is a no-op,
+   * so a double-tap on Save can never reset a report that is already uploading.
+   */
   async enqueue(report: Report): Promise<void> {
-    await this.store.put(report);
+    if ((await this.store.get(report.id)) === null) {
+      await this.store.put(report);
+    }
     await this.refresh();
     this.kick();
   }
