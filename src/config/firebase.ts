@@ -1,27 +1,55 @@
-import { Platform } from 'react-native';
-import { connectFirestoreEmulator, getFirestore } from '@react-native-firebase/firestore';
-import { connectStorageEmulator, getStorage } from '@react-native-firebase/storage';
+import { getApp } from '@react-native-firebase/app';
+import {
+  connectFirestoreEmulator,
+  Firestore,
+  initializeFirestore,
+} from '@react-native-firebase/firestore';
+import {
+  connectStorageEmulator,
+  FirebaseStorage,
+  getStorage,
+} from '@react-native-firebase/storage';
 
-// The Android emulator reaches the dev machine's localhost via 10.0.2.2.
-// A physical device needs the machine's LAN IP (or `adb reverse`, see README).
-const EMULATOR_HOST = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
+// Debug builds talk to the Firebase Emulator Suite through `adb reverse`
+// (npm run adb:reverse), which forwards the phone's 127.0.0.1 ports to this PC.
+// It works the same for a USB phone and for an Android Studio emulator.
+const EMULATOR_HOST = '127.0.0.1';
 const FIRESTORE_PORT = 8080;
 const STORAGE_PORT = 9199;
 
-let configured = false;
+let firestoreInstance: Firestore | null = null;
+let storageInstance: FirebaseStorage | null = null;
 
 /**
- * Points Firebase at the local Emulator Suite in debug builds. Must run once,
- * before the first Firestore/Storage call, otherwise the SDK has already
- * talked to production and the emulator settings are rejected.
+ * Must run once, before the first Firestore/Storage call.
+ *
+ * Firestore offline persistence is switched OFF on purpose: with it on, a
+ * `setDoc` made offline is silently queued by the SDK and "succeeds" later,
+ * outside our control. Our own SQLite queue is the only source of truth for
+ * what has and has not been delivered.
  */
 export function configureFirebase(): void {
-  if (configured) {
+  if (firestoreInstance) {
     return;
   }
-  configured = true;
+  firestoreInstance = initializeFirestore(getApp(), { persistence: false });
+  storageInstance = getStorage();
   if (__DEV__) {
-    connectFirestoreEmulator(getFirestore(), EMULATOR_HOST, FIRESTORE_PORT);
-    connectStorageEmulator(getStorage(), EMULATOR_HOST, STORAGE_PORT);
+    connectFirestoreEmulator(firestoreInstance, EMULATOR_HOST, FIRESTORE_PORT);
+    connectStorageEmulator(storageInstance, EMULATOR_HOST, STORAGE_PORT);
   }
+}
+
+export function getFirestoreInstance(): Firestore {
+  if (!firestoreInstance) {
+    configureFirebase();
+  }
+  return firestoreInstance as Firestore;
+}
+
+export function getStorageInstance(): FirebaseStorage {
+  if (!storageInstance) {
+    configureFirebase();
+  }
+  return storageInstance as FirebaseStorage;
 }
