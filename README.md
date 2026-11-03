@@ -39,7 +39,7 @@ npm run test-images     # generates a ~47 MB noise JPEG and pushes it to the pho
 
 `npm run test-images` exists to test the "18 MB original" case: pick that file in the app and it arrives as roughly 2.6 MB.
 
-Only the **debug** build is verified on a device. A release build (`assembleRelease`) was attempted but could not finish on the development PC because the system drive ran out of disk space, so treat release as unverified.
+The debug build is the one exercised on a device. `cd android && ./gradlew assembleRelease` also builds successfully (APK at `android/app/build/outputs/apk/release/app-release.apk`), but I have not installed or run that APK on the phone.
 
 ## Backend setup
 
@@ -179,7 +179,7 @@ Deletes the local queue, the prepared images, and leftover picker temp files, th
 - **A foreground service is not a guarantee** (see Background).
 - **Android only.** No iOS work.
 - **No dark mode, no localisation, no accessibility audit** beyond sensible tap targets and labels.
-- **Not verified on a device:** a real maximum-resolution camera photo and a photo with EXIF rotation (covered by the library and by a synthetic 47 MB image only), the full "airplane → kill → throttle → drop twice" scenario in one unbroken run, the release build.
+- **Not verified on a device:** a real maximum-resolution camera photo and a photo with EXIF rotation (covered by the library and by a synthetic 47 MB image only), the full "airplane → kill → throttle → drop twice" scenario in one unbroken run, and running the release APK.
 
 ## With another day
 
