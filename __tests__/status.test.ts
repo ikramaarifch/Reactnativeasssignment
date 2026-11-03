@@ -75,6 +75,16 @@ describe('describeReport: one glance, one answer', () => {
     expect(describeReport(r, { ...ctx, isOnline: false }).detail).toContain('network returns');
   });
 
+  it('failed_retrying does not repeat "will retry automatically" that the title already says', () => {
+    const r = withStatus('failed_retrying', {
+      nextAttemptAt: 12_000,
+      failure: { code: 'network', reason: 'No connection to the server. Will retry automatically.', at: 0 },
+    });
+    const view = describeReport(r, ctx);
+    expect(view.title).toMatch(/will retry automatically/i);
+    expect(view.detail).toBe('No connection to the server. Next try in 2 s.');
+  });
+
   it('failed_permanent shows the reason and allows Try again', () => {
     const view = describeReport(
       withStatus('failed_permanent', {
@@ -136,9 +146,18 @@ describe('ConnectivityMonitor + retry triggers', () => {
     const kicks: unknown[] = [];
     let foreground: () => void = () => {};
     const stop = startRetryTriggers(
-      { kick: o => void kicks.push(o) },
+      {
+        kick: o => {
+          kicks.push(o);
+        },
+      },
       monitor,
-      { onForeground: l => ((foreground = l), () => {}) },
+      {
+        onForeground: l => {
+          foreground = l;
+          return () => {};
+        },
+      },
     );
     return { monitor, kicks, emit: (o: boolean) => emit(o), foreground: () => foreground(), stop, unsub: () => unsubscribed };
   }

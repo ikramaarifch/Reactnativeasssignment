@@ -1,3 +1,5 @@
+import type { Tone } from '../core/statusView';
+
 export const colors = {
   bg: '#ffffff',
   surface: '#f4f6f8',
@@ -16,3 +18,12 @@ export const colors = {
 
 /** Minimum touch target (points), per platform guidelines. */
 export const HIT = 48;
+
+/** Colours for each status tone. Always paired with text, never colour alone. */
+export const toneColors: Record<Tone, { bg: string; fg: string; bar: string }> = {
+  neutral: { bg: colors.surface, fg: colors.text, bar: colors.muted },
+  progress: { bg: '#e8f0fe', fg: '#1d3f8f', bar: colors.primary },
+  success: { bg: colors.successBg, fg: colors.successText, bar: '#2e7d32' },
+  warning: { bg: colors.warnBg, fg: colors.warnText, bar: '#d97706' },
+  danger: { bg: colors.dangerBg, fg: colors.danger, bar: colors.danger },
+};

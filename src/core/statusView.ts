@@ -92,7 +92,10 @@ export function describeReport(report: Report, ctx: ViewContext): ReportStatusVi
       return { tone: 'success', title: 'Uploaded to server', canRetry: false };
 
     case 'failed_retrying': {
-      const reason = report.failure?.reason ?? 'Something went wrong.';
+      // The title already says it will retry; keep the reason to what went wrong.
+      const reason = (report.failure?.reason ?? 'Something went wrong.')
+        .replace(/\s*Will retry automatically\.?$/i, '')
+        .trim();
       let next: string;
       if (ctx.isOnline === false) {
         next = 'Will try again as soon as the network returns.';
