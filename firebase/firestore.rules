@@ -1,0 +1,19 @@
+rules_version = '2';
+
+// reports/{reportId} is the commit marker: it is only ever written once every
+// image is confirmed in Storage. Writes use set() so retries overwrite, never
+// duplicate. No login in scope, so access is open; add request.auth in production.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /reports/{reportId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.status == 'complete'
+        && request.resource.data.description is string
+        && request.resource.data.description.trim().size() > 0
+        && request.resource.data.imagePaths is list
+        && request.resource.data.imagePaths.size() >= 1
+        && request.resource.data.imagePaths.size() <= 5;
+      allow delete: if false;
+    }
+  }
+}
