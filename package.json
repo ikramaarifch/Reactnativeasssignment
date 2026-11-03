@@ -9,7 +9,7 @@
     "start": "react-native start",
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "emulators": "firebase emulators:start --project demo-field-reports"
+    "emulators": "firebase emulators:start --project rnassignment-94abb"
   },
   "dependencies": {
     "@op-engineering/op-sqlite": "^19.0.3",
