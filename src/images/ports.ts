@@ -8,6 +8,8 @@ export interface FileSystemPort {
   ensureDir(path: string): Promise<void>;
   /** Moves, replacing the destination if it exists. */
   move(from: string, to: string): Promise<void>;
+  /** Names (not paths) of the entries in a directory; empty if it does not exist. */
+  list(dir: string): Promise<string[]>;
   /** Copies a file, replacing the destination if it exists. */
   copy(from: string, to: string): Promise<void>;
   /** Deletes a file or a directory tree; a missing path is not an error. */

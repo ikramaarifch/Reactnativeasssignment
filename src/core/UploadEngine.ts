@@ -67,6 +67,8 @@ export class UploadEngine {
   private rerun = false;
   private wakeTimer: ReturnType<typeof setTimeout> | null = null;
   private started = false;
+  /** Bumped by stop()/reset(); lets stray async work notice it belongs to a dead run. */
+  private epoch = 0;
 
   constructor(options: EngineOptions) {
     this.store = options.store;
@@ -112,10 +114,26 @@ export class UploadEngine {
   /** Aborts in-flight work, waits for it to settle and stops scheduling. */
   async stop(): Promise<void> {
     this.started = false;
+    this.epoch++;
     this.abort.abort();
     this.clearWake();
-    await this.draining;
+    while (this.draining) {
+      await this.draining;
+    }
     this.setProgress(null);
+  }
+
+  /**
+   * Wipes the local queue. Order matters: abort and WAIT for in-flight work
+   * first (so nothing can write a row or file afterwards), then clear. Leaves
+   * the engine stopped; call start() to resume with an empty queue. Does not
+   * touch the server.
+   */
+  async reset(): Promise<void> {
+    await this.stop();
+    await this.store.clear();
+    this.state = { reports: [], progress: null };
+    this.emit();
   }
 
   /**
@@ -136,12 +154,19 @@ export class UploadEngine {
     if (!this.started) {
       return;
     }
+    const epoch = this.epoch;
     (async () => {
       if (options.skipBackoff) {
         for (const r of await this.store.list()) {
+          if (epoch !== this.epoch) {
+            return; // stopped or reset meanwhile: do not write into a cleared queue
+          }
           if (r.status === 'failed_retrying') {
             await this.store.put({ ...r, nextAttemptAt: this.now() });
           }
+        }
+        if (epoch !== this.epoch) {
+          return;
         }
         await this.refresh();
       }
@@ -154,7 +179,7 @@ export class UploadEngine {
   /** Manual "Try again" for a failed_permanent report. */
   async retry(id: string): Promise<void> {
     const report = await this.store.get(id);
-    if (!report || report.status !== 'failed_permanent') {
+    if (!this.started || !report || report.status !== 'failed_permanent') {
       return;
     }
     await this.transition(report, 'saved_locally', {
@@ -379,6 +404,7 @@ export class UploadEngine {
     to: ReportStatus,
     patch: Partial<Report> = {},
   ): Promise<Report> {
+    this.throwIfAborted();
     assertTransition(report.status, to);
     const next: Report = { ...report, ...patch, status: to };
     await this.store.put(next);
@@ -391,6 +417,7 @@ export class UploadEngine {
     index: number,
     patch: Partial<ImageRecord>,
   ): Promise<Report> {
+    this.throwIfAborted();
     const next: Report = {
       ...report,
       images: report.images.map(i => (i.index === index ? { ...i, ...patch } : i)),
@@ -398,6 +425,13 @@ export class UploadEngine {
     await this.store.put(next);
     await this.refresh();
     return next;
+  }
+
+  /** Once aborted (stop/reset) no further state may be persisted. */
+  private throwIfAborted(): void {
+    if (this.abort.signal.aborted) {
+      throw new Error('aborted');
+    }
   }
 
   private async refresh(): Promise<void> {

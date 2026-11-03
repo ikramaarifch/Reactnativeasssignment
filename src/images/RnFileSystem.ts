@@ -18,6 +18,7 @@ export const rnFileSystem: FileSystemPort = {
     }
     await fs.mv(from, to);
   },
+  list: async dir => ((await fs.exists(dir)) ? fs.ls(dir) : []),
   copy: async (from, to) => {
     if (await fs.exists(to)) {
       await fs.unlink(to);

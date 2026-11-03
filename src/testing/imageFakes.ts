@@ -6,7 +6,7 @@ export class FakeFileSystem implements FileSystemPort {
   dirs = new Set<string>();
 
   async exists(path: string): Promise<boolean> {
-    return this.files.has(path);
+    return this.files.has(path) || [...this.files.keys()].some(k => k.startsWith(path + '/'));
   }
   async sizeOf(path: string): Promise<number> {
     const f = this.files.get(path);
@@ -37,6 +37,15 @@ export class FakeFileSystem implements FileSystemPort {
     }
     this.files.delete(from);
     this.files.set(to, f);
+  }
+  async list(dir: string): Promise<string[]> {
+    const names = new Set<string>();
+    for (const key of this.files.keys()) {
+      if (key.startsWith(dir + '/')) {
+        names.add(key.slice(dir.length + 1).split('/')[0] as string);
+      }
+    }
+    return [...names];
   }
   /** Set to make the Nth copy (1-based) fail, to test cleanup. */
   failCopyNumber?: number;
