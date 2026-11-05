@@ -68,6 +68,7 @@ export function AppShell({ services }: { services: Services }) {
             key={composeKey}
             save={services.save}
             newReportId={services.newReportId}
+            draft={services.draft}
             onViewReports={() => setTab('reports')}
           />
         </View>

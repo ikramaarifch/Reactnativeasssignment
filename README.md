@@ -31,7 +31,7 @@ npm run android         # builds and installs the debug app
 Useful extras:
 
 ```sh
-npm test                # 213 Jest tests, no device needed
+npm test                # 229 Jest tests, no device needed
 npm run typecheck       # tsc --noEmit (strict, no `any`)
 npm run lint
 npm run test-images     # generates a ~47 MB noise JPEG and pushes it to the phone's gallery
@@ -113,6 +113,7 @@ saved_locally → preparing → uploading → finalizing → uploaded
 ### Why nothing is lost
 
 - **Save is local and instant.** Photos are copied into the app's own storage first (so deleting them from the gallery cannot hurt), then the report is committed to SQLite with `synchronous=FULL` and WAL. Only then does the UI say "Saved". It never waits for the network.
+- **The form survives the app being killed.** On a low-memory phone Android can kill the app while the camera is in front (seen on the test device: the photo and text were silently lost). The camera is therefore given a file path chosen by the app (small native module + FileProvider), and that path is saved with the draft (description and photos, on disk) before the camera opens. After a kill, the next start finds the photo at that path and restores the form. This is only a draft: nothing is "saved" until the report is in the queue. The gallery picker is the lightweight system picker and does not use this path.
 - **Resume on start.** Startup re-reads the queue and continues anything not `uploaded`.
 - **Retries** happen on a timer (exponential backoff with full jitter, 2 s base, 5 min cap) *and* immediately when connectivity returns or the app comes to the foreground.
 
@@ -193,4 +194,4 @@ Deletes the local queue, the prepared images, and leftover picker temp files, th
 
 ## Tests
 
-`npm test` runs 213 tests in 14 suites, covering: the state machine, kill-and-restart at every state, idempotent enqueue, lost responses (server stored it, client never heard), every error classification, the watchdog (including "slow but moving is allowed"), the image pipeline against fake files, the SQLite store (real SQLite), reset (including race conditions that were mutation-checked, meaning the test fails when the guard is removed), background controller behaviour, review paging and states, and the Cloudinary transport against a fake that reproduces the verified server behaviour.
+`npm test` runs 229 tests in 15 suites, covering: the state machine, kill-and-restart at every state, idempotent enqueue, lost responses (server stored it, client never heard), every error classification, the watchdog (including "slow but moving is allowed"), the image pipeline against fake files, the SQLite store (real SQLite), reset (including race conditions that were mutation-checked, meaning the test fails when the guard is removed), background controller behaviour, review paging and states, and the Cloudinary transport against a fake that reproduces the verified server behaviour.

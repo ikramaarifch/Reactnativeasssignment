@@ -61,6 +61,12 @@ export class FakeFileSystem implements FileSystemPort {
     }
     this.files.set(to, { ...f });
   }
+  async readText(path: string): Promise<string | null> {
+    return this.files.get(path)?.tag ?? null;
+  }
+  async writeText(path: string, text: string): Promise<void> {
+    this.files.set(path, { size: text.length, tag: text });
+  }
   async remove(path: string): Promise<void> {
     this.files.delete(path);
     for (const key of [...this.files.keys()]) {

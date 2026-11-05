@@ -12,6 +12,10 @@ export interface FileSystemPort {
   list(dir: string): Promise<string[]>;
   /** Copies a file, replacing the destination if it exists. */
   copy(from: string, to: string): Promise<void>;
+  /** Contents of a UTF-8 text file, or null if it does not exist. */
+  readText(path: string): Promise<string | null>;
+  /** Writes (replacing) a UTF-8 text file. The parent directory must exist. */
+  writeText(path: string, text: string): Promise<void>;
   /** Deletes a file or a directory tree; a missing path is not an error. */
   remove(path: string): Promise<void>;
 }

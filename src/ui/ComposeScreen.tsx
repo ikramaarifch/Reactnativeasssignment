@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -17,11 +17,11 @@ import { SaveReportError } from '../app/saveReport';
 import { ReportValidationError, validateReportInput, ValidationError } from '../core/report';
 import { MAX_IMAGES } from '../core/types';
 import { cameraPermission } from '../permissions/rnCameraPermission';
-import { pickFromGallery, takePhoto } from './photoPicker';
+import { pickFromGallery } from './photoPicker';
 import { colors, HIT } from './theme';
 import { usePermission } from './useCameraPermission';
 
-type Props = Pick<Services, 'save' | 'newReportId'> & {
+type Props = Pick<Services, 'save' | 'newReportId' | 'draft'> & {
   /** Jump to the queue so the user can watch the report's status. */
   onViewReports: () => void;
 };
@@ -31,7 +31,7 @@ type Props = Pick<Services, 'save' | 'newReportId'> & {
  * core, the save flow in app/saveReport, and the upload happens later in the
  * engine. "Saved" here always means "on this phone", never "uploaded".
  */
-export function ComposeScreen({ save, newReportId, onViewReports }: Props) {
+export function ComposeScreen({ save, newReportId, draft, onViewReports }: Props) {
   // One id per draft: pressing Save twice is idempotent (same report, not two).
   const draftId = useRef(newReportId());
   const [description, setDescription] = useState('');
@@ -44,6 +44,42 @@ export function ComposeScreen({ save, newReportId, onViewReports }: Props) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const camera = usePermission(cameraPermission);
+  const [restored, setRestored] = useState(false); // the draft on disk has been read
+
+  // Android may have killed the app while the camera was open: bring back what was typed and taken.
+  useEffect(() => {
+    let cancelled = false;
+    draft
+      .load()
+      .then(previous => {
+        if (cancelled || !previous) {
+          return;
+        }
+        draftId.current = previous.id;
+        setDescription(previous.description);
+        setPhotos(previous.photos);
+      })
+      .catch(() => {}) // an unreadable draft is the same as none
+      .finally(() => {
+        if (!cancelled) {
+          setRestored(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft]);
+
+  // Keep the draft on disk as the form changes (debounced; the camera path flushes it itself).
+  useEffect(() => {
+    if (!restored || saved) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      draft.save({ id: draftId.current, description, photos }).catch(() => {});
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [restored, saved, draft, description, photos]);
 
   const errors = useMemo(
     () => validateReportInput({ description, imageUris: photos }),
@@ -91,9 +127,9 @@ export function ComposeScreen({ save, newReportId, onViewReports }: Props) {
     if (!granted) {
       return; // the banner below explains what to do
     }
-    const result = await takePhoto();
-    if (result.kind === 'picked') {
-      applyPicked(result.uris);
+    const result = await draft.capture({ id: draftId.current, description, photos });
+    if (result.kind === 'captured') {
+      applyPicked([result.uri]);
     } else if (result.kind === 'error') {
       setNotice(result.message);
     }
@@ -112,6 +148,7 @@ export function ComposeScreen({ save, newReportId, onViewReports }: Props) {
     try {
       await save({ id: draftId.current, description, photoUris: photos });
       setSaved(true);
+      await draft.clear().catch(() => {}); // the report now has its own copies
     } catch (e) {
       setSaveError(
         e instanceof SaveReportError || e instanceof ReportValidationError

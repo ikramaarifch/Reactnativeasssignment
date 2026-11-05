@@ -77,3 +77,6 @@ yarn-error.log
 # firebase emulator logs
 *-debug.log
 .firebase/
+
+# Generated JS bundle (release builds)
+android/app/src/main/assets/index.android.bundle

@@ -10,6 +10,10 @@ export interface ResetDeps {
   imagesDir: string;
   /** Compressed files waiting to upload. */
   preparedDir: string;
+  /** The unsaved form and the camera photos taken for it. */
+  draft: { clear(): Promise<void> };
+  draftFile: string;
+  capturesDir: string;
   /** The OS/app cache dir, where the photo picker leaves temp copies. */
   cacheDir: string;
 }
@@ -41,6 +45,7 @@ export async function resetAll(deps: ResetDeps): Promise<void> {
 
     await fs.remove(deps.imagesDir);
     await fs.remove(deps.preparedDir);
+    await deps.draft.clear();
     for (const name of await fs.list(deps.cacheDir)) {
       if (name.startsWith(PICKER_TEMP_PREFIX)) {
         await fs.remove(`${deps.cacheDir}/${name}`);
@@ -56,7 +61,7 @@ export async function resetAll(deps: ResetDeps): Promise<void> {
   }
 }
 
-async function findLeftovers({ store, fs, imagesDir, preparedDir, cacheDir }: ResetDeps): Promise<string[]> {
+async function findLeftovers({ store, fs, imagesDir, preparedDir, cacheDir, draftFile, capturesDir }: ResetDeps): Promise<string[]> {
   const left: string[] = [];
   if ((await store.list()).length > 0) {
     left.push('queue entries');
@@ -66,6 +71,9 @@ async function findLeftovers({ store, fs, imagesDir, preparedDir, cacheDir }: Re
   }
   if (await fs.exists(preparedDir)) {
     left.push('prepared files');
+  }
+  if ((await fs.exists(draftFile)) || (await fs.exists(capturesDir))) {
+    left.push('draft and camera photos');
   }
   if ((await fs.list(cacheDir)).some(n => n.startsWith(PICKER_TEMP_PREFIX))) {
     left.push('picker temp files');

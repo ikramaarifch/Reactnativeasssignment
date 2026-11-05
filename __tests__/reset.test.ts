@@ -1,3 +1,4 @@
+import { DraftService } from '../src/app/draft';
 import { resetAll, ResetDeps, ResetError } from '../src/app/reset';
 import { planReset } from '../src/core/resetPlan';
 import { Report, ReportStatus } from '../src/core/types';
@@ -161,6 +162,8 @@ describe('resetAll: no orphan files', () => {
     imagesDir: '/docs/images',
     preparedDir: '/docs/prepared',
     cacheDir: '/cache',
+    draftFile: '/docs/draft.json',
+    capturesDir: '/docs/captures',
   };
 
   function setup() {
@@ -170,12 +173,21 @@ describe('resetAll: no orphan files', () => {
     put('/docs/images/r1/0.jpg');
     put('/docs/images/r1/1.jpg');
     put('/docs/prepared/r1_0.jpg');
+    put('/docs/draft.json');
+    put('/docs/captures/d1-1.jpg');
     put('/cache/rn_image_picker_lib_temp_aaa.jpg');
     put('/cache/rn_image_picker_lib_temp_bbb.jpg');
     put('/cache/unrelated-cache-file.bin'); // not ours: must survive
     const engine = h.engine();
     const started = jest.spyOn(engine, 'start');
-    const deps: ResetDeps = { engine, store: h.store, fs, ...DIRS };
+    const draft = new DraftService({
+      fs,
+      camera: { capture: async () => 'cancelled' },
+      draftFile: DIRS.draftFile,
+      capturesDir: DIRS.capturesDir,
+      now: () => 0,
+    });
+    const deps: ResetDeps = { engine, store: h.store, fs, draft, ...DIRS };
     return { h, fs, engine, started, deps };
   }
 
@@ -186,6 +198,7 @@ describe('resetAll: no orphan files', () => {
     await until(engine, reportIs('r1', 'uploaded'));
 
     await resetAll(deps);
+    // includes the unsaved draft and the camera photos taken for it
     expect([...fs.files.keys()]).toEqual(['/cache/unrelated-cache-file.bin']);
     expect(await h.store.list()).toEqual([]);
     await h.stopAll();

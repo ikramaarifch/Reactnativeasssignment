@@ -25,6 +25,10 @@ export const rnFileSystem: FileSystemPort = {
     }
     await fs.cp(from, to);
   },
+  readText: async path => ((await fs.exists(path)) ? fs.readFile(path, 'utf8') : null),
+  writeText: async (path, text) => {
+    await fs.writeFile(path, text, 'utf8');
+  },
   remove: async path => {
     if (await fs.exists(path)) {
       await fs.unlink(path);

@@ -22,7 +22,9 @@ import { rnCloudinaryHttp } from '../transport/cloudinary/rnCloudinaryHttp';
 import { thumbnailUrl } from '../transport/cloudinary/urls';
 import { FirestoreCommitter } from '../transport/FirestoreCommitter';
 import { HybridTransport } from '../transport/HybridTransport';
+import { DraftService } from './draft';
 import { resetAll, ResetError } from './reset';
+import { rnCameraCapture } from './rnCameraCapture';
 import { saveReport, SaveReportInput } from './saveReport';
 
 export interface Services {
@@ -35,6 +37,8 @@ export interface Services {
   /** A fresh report id for a new draft (UUID v4, generated on the phone). */
   newReportId: () => string;
   save: (input: SaveReportInput) => Promise<Report>;
+  /** The unsaved compose form, kept on disk so a killed app loses nothing. */
+  draft: DraftService;
   /** "Start over": wipes everything local. Never touches the server. */
   reset: () => Promise<void>;
 }
@@ -68,6 +72,15 @@ export function getServices(): Services {
       thumbnailUrl(CLOUDINARY.cloudName, path),
     );
     const imagesDir = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/images`;
+    const draftFile = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/draft.json`;
+    const capturesDir = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/captures`;
+    const draft = new DraftService({
+      fs: rnFileSystem,
+      camera: rnCameraCapture,
+      draftFile,
+      capturesDir,
+      now: Date.now,
+    });
     const connectivity = createConnectivityMonitor();
     services = {
       engine,
@@ -86,6 +99,7 @@ export function getServices(): Services {
           globalThis.crypto.getRandomValues(bytes as Uint8Array<ArrayBuffer>);
           return bytes;
         }),
+      draft,
       save: input => saveReport({ fs: rnFileSystem, engine, imagesDir, now: Date.now }, input),
       reset: async () => {
         try {
@@ -95,6 +109,9 @@ export function getServices(): Services {
             fs: rnFileSystem,
             imagesDir,
             preparedDir: PREPARED_DIR,
+            draft,
+            draftFile,
+            capturesDir,
             cacheDir: ReactNativeBlobUtil.fs.dirs.CacheDir,
           });
         } catch (e) {

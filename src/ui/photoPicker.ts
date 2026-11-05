@@ -1,4 +1,4 @@
-import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { launchImageLibrary } from 'react-native-image-picker';
 
 export type PickResult =
   | { kind: 'picked'; uris: string[] }
@@ -15,12 +15,7 @@ export async function pickFromGallery(selectionLimit: number): Promise<PickResul
   return toResult(response);
 }
 
-export async function takePhoto(): Promise<PickResult> {
-  const response = await launchCamera({ mediaType: 'photo', saveToPhotos: false });
-  return toResult(response);
-}
-
-function toResult(response: Awaited<ReturnType<typeof launchCamera>>): PickResult {
+function toResult(response: Awaited<ReturnType<typeof launchImageLibrary>>): PickResult {
   if (response.didCancel) {
     return { kind: 'cancelled' };
   }
@@ -28,11 +23,9 @@ function toResult(response: Awaited<ReturnType<typeof launchCamera>>): PickResul
     return {
       kind: 'error',
       message:
-        response.errorCode === 'camera_unavailable'
-          ? 'No camera is available on this device.'
-          : response.errorCode === 'permission'
-            ? 'Permission was denied.'
-            : response.errorMessage ?? 'Could not get the photo.',
+        response.errorCode === 'permission'
+          ? 'Permission was denied.'
+          : response.errorMessage ?? 'Could not get the photo.',
     };
   }
   const uris = (response.assets ?? []).flatMap(a => (a.uri ? [a.uri] : []));
